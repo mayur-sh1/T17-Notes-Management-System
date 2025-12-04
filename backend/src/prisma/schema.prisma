@@ -1,0 +1,177 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  USER
+  ADMIN
+}
+
+enum Permission {
+  READ
+  WRITE
+  DELETE
+  ADMIN
+}
+
+model User {
+  id            String   @id @default(uuid())
+  email         String   @unique
+  username      String   @unique
+  password      String
+  role          Role     @default(USER)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  notes         Note[]
+  sharedNotes   Share[]
+  groups        GroupMember[]
+  createdGroups Group[]  @relation("GroupCreator")
+  comments      Comment[]
+  notifications Notification[]
+  
+  @@index([email])
+  @@index([username])
+}
+
+model Note {
+  id            String          @id @default(uuid())
+  title         String
+  content       String          @db.Text
+  isRichText    Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  authorId      String
+  author        User            @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  
+  tags          NoteTag[]
+  shares        Share[]
+  versions      VersionHistory[]
+  comments      Comment[]
+  
+  @@index([authorId])
+  @@index([createdAt])
+  @@index([updatedAt])
+  @@index([title])
+}
+
+model Tag {
+  id        String   @id @default(uuid())
+  name      String   @unique
+  color     String?  @default("#3B82F6")
+  createdAt DateTime @default(now())
+  
+  notes     NoteTag[]
+  
+  @@index([name])
+}
+
+model NoteTag {
+  id     String @id @default(uuid())
+  noteId String
+  tagId  String
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  
+  @@unique([noteId, tagId])
+  @@index([noteId])
+  @@index([tagId])
+}
+
+model Share {
+  id         String     @id @default(uuid())
+  noteId     String
+  userId     String?
+  groupId    String?
+  permission Permission @default(READ)
+  createdAt  DateTime   @default(now())
+  
+  note       Note       @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user       User?      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  group      Group?     @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  
+  @@index([noteId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model Group {
+  id          String         @id @default(uuid())
+  name        String
+  description String?        @db.Text
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  creatorId   String
+  creator     User           @relation("GroupCreator", fields: [creatorId], references: [id])
+  
+  members     GroupMember[]
+  shares      Share[]
+  
+  @@index([creatorId])
+}
+
+model GroupMember {
+  id       String   @id @default(uuid())
+  groupId  String
+  userId   String
+  role     String   @default("MEMBER")
+  joinedAt DateTime @default(now())
+  
+  group    Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@unique([groupId, userId])
+  @@index([userId])
+  @@index([groupId])
+}
+
+model Comment {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  noteId    String
+  userId    String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([noteId])
+  @@index([createdAt])
+}
+
+model VersionHistory {
+  id        String   @id @default(uuid())
+  noteId    String
+  title     String
+  content   String   @db.Text
+  createdAt DateTime @default(now())
+  createdBy String
+  
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  
+  @@index([noteId])
+  @@index([createdAt])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  type      String
+  title     String
+  message   String   @db.Text
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+  
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([userId, read])
+  @@index([createdAt])
+}
+
